@@ -1,1 +1,62 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Live WordPress Instance on EC2
+
+Parameters:
+  KeyName:WordPress
+    Description: EC2 Key Pair to SSH
+    Type: AWS::EC2::KeyPair::WordPress
+
+Resources:
+  WordPressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP, HTTPS, and SSH
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  WordPressInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: !Ref WordPress
+      SecurityGroups:
+        - !Ref WordPressSecurityGroup
+      ImageId: ami-00a929b66ed6e0de6  # Amazon Linux 2 AMI
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          amazon-linux-extras install -y php7.4
+          yum install -y httpd php php-mysqlnd mariadb
+          systemctl start httpd
+          systemctl enable httpd
+          cd /var/www/html
+          wget https://wordpress.org/latest.tar.gz
+          tar -xzf latest.tar.gz
+          cp -r wordpress/* .
+          rm -rf wordpress latest.tar.gz
+          chown -R apache:apache /var/www/html
+          systemctl restart httpd
+
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref WordPressInstance
+
+Outputs:
+  WebsiteURL:
+    Description: URL of WordPress Site
+    Value: !Sub "http://${ElasticIP}"
 
