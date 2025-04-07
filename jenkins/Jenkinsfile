@@ -1,1 +1,54 @@
+pipeline {
+  agent any
+
+  environment {
+    STACK_NAME = "LiveWordPress"
+    DEV_STACK_NAME = "DevTestWordPress"
+    AWS_REGION = "us-east-1"
+    KEY_NAME = "your-key-pair" // change this to your actual Key Pair name
+  }
+
+  stages {
+    stage('Checkout Code') {
+      steps {
+        git url: 'https://github.com/your-username/wordpress-infra.git', branch: 'main'
+      }
+    }
+
+    stage('Deploy Live WordPress') {
+      steps {
+        sh '''
+          aws cloudformation deploy \
+            --template-file live-wordpress.yaml \
+            --stack-name $STACK_NAME \
+            --parameter-overrides KeyName=$KEY_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION
+        '''
+      }
+    }
+
+    stage('Deploy Dev/Test WordPress') {
+      steps {
+        sh '''
+          aws cloudformation deploy \
+            --template-file devtest-wordpress.yaml \
+            --stack-name $DEV_STACK_NAME \
+            --parameter-overrides KeyName=$KEY_NAME \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --region $AWS_REGION
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      echo '✅ CloudFormation stacks deployed successfully!'
+    }
+    failure {
+      echo '❌ Deployment failed. Please check the logs.'
+    }
+  }
+}
 
